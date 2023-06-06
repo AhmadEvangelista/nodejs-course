@@ -1,29 +1,68 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../util/database');
+const { getDb } = require('../util/database');
+const mongo = require('mongodb');
 
-const Product = sequelize.define('product', {
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    allowNull: false,
-    primaryKey: true,
-  },
-  title: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  price: {
-    type: DataTypes.DOUBLE,
-    allowNull: false,
-  },
-  imageUrl: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-  description: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-});
+const ObjectId = mongo.ObjectId;
+
+class Product {
+  constructor(title, price, description, imageUrl, userId) {
+    this.title = title;
+    this.price = price;
+    this.description = description;
+    this.imageUrl = imageUrl;
+    this.userId = new ObjectId(userId);
+  }
+
+  save() {
+    const db = getDb();
+
+    return db
+      .collection('products')
+      .insertOne(this)
+      .then((result) => console.log(result))
+      .catch((err) => console.log(err));
+  }
+
+  static fetchAll() {
+    const db = getDb();
+
+    return db
+      .collection('products')
+      .find({})
+      .toArray()
+      .then((result) => result)
+      .catch((err) => console.log(err));
+  }
+
+  static fetchOne(id) {
+    const db = getDb();
+
+    return db
+      .collection('products')
+      .find({ _id: new ObjectId(id) })
+      .toArray()
+      .then((result) => result[0])
+      .catch((err) => console.log(err));
+  }
+
+  static removeOne(id) {
+    const db = getDb();
+
+    return db
+      .collection('products')
+      .deleteOne({ _id: new ObjectId(id) })
+      .then((result) => result)
+      .catch((err) => console.log(err));
+  }
+
+  static updateOne(id, parameter) {
+    const db = getDb();
+
+    return db
+      .collection('products')
+      .updateOne({ _id: new ObjectId(id) }, { $set: parameter })
+      .then((result) => result)
+      .catch((err) => console.log(err));
+  }
+}
 
 module.exports = Product;
