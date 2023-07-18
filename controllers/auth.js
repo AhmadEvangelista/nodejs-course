@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const sgMail = require('@sendgrid/mail');
 const User = require('../models/user');
+const { validationResult } = require('express-validator');
 require('dotenv').config();
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -17,6 +18,11 @@ exports.getLogin = (req, res, next) => {
     pageTitle: 'Login',
     path: '/login',
     errorMessage: message,
+    prevInput: {
+      email: '',
+      password: '',
+    },
+    validationErrors: [],
   });
 };
 
@@ -31,17 +37,47 @@ exports.getSignup = (req, res, next) => {
     path: '/signup',
     pageTitle: 'Signup',
     errorMessage: message,
+    prevInput: {
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+    validationErrors: [],
   });
 };
 
 exports.postLogin = (req, res, next) => {
   const email = req.body.email;
   const password = req.body.password;
+  const errors = validationResult(req).array();
+
+  if (errors.length > 0) {
+    return res.status(422).render('auth/login', {
+      path: '/login',
+      pageTitle: 'Login',
+      errorMessage: errors[0].msg,
+      prevInput: {
+        email: email,
+        password: password,
+      },
+      validationErrors: errors,
+    });
+  }
+  console.log(req.body.email, password);
+
   User.findOne({ email: email })
     .then((user) => {
       if (!user) {
-        req.flash('error', 'Invalid email or password.');
-        return res.redirect('/login');
+        return res.status(422).render('auth/login', {
+          path: '/login',
+          pageTitle: 'Login',
+          errorMessage: 'Invalid email or password.',
+          prevInput: {
+            email: email,
+            password: password,
+          },
+          validationErrors: [],
+        });
       }
       bcrypt
         .compare(password, user.password)
@@ -54,8 +90,16 @@ exports.postLogin = (req, res, next) => {
               res.redirect('/');
             });
           }
-          req.flash('error', 'Invalid email or password.');
-          return res.redirect('/login');
+          return res.status(422).render('auth/login', {
+            path: '/login',
+            pageTitle: 'Login',
+            errorMessage: 'Invalid email or password.',
+            prevInput: {
+              email: email,
+              password: password,
+            },
+            validationErrors: [],
+          });
         })
         .catch((err) => {
           console.log(err);
@@ -67,47 +111,53 @@ exports.postLogin = (req, res, next) => {
 exports.postSignup = (req, res, next) => {
   const email = req.body.email;
   const password = req.body.password;
-  const confirmPassword = req.body.confirmPassword;
+  const errors = validationResult(req).array();
 
-  User.findOne({ email: email })
-    .then((userDoc) => {
-      if (userDoc) {
-        req.flash('error', 'E-mail already exist');
-        return res.redirect('/signup');
-      }
-      return bcrypt
-        .hash(password, 12)
-        .then((hashedPassword) => {
-          const user = new User({
-            email: email,
-            password: hashedPassword,
-            cart: { items: [] },
-          });
-          return user.save();
-        })
-        .then(() => {
-          res.redirect('/login');
+  if (errors.length > 0) {
+    return res.status(422).render('auth/signup', {
+      path: '/signup',
+      pageTitle: 'Signup',
+      errorMessage: errors[0].msg,
+      prevInput: {
+        email: email,
+        password: password,
+        confirmPassword: req.body.confirmPassword,
+      },
+      validationErrors: errors,
+    });
+  }
 
-          const msg = {
-            to: email,
-            from: 'dahma.evangelista@gmail.com',
-            subject: 'Signup succeeded!',
-            text: 'Signup succeeded!',
-            html: '<h1>You successfully signed up</h1>',
-          };
-
-          return sgMail
-            .send(msg)
-            .then((response) => {
-              console.log(response[0].statusCode);
-              console.log(response[0].headers);
-            })
-            .catch((error) => {
-              console.error(error);
-            });
-        });
+  bcrypt
+    .hash(password, 12)
+    .then((hashedPassword) => {
+      const user = new User({
+        email: email,
+        password: hashedPassword,
+        cart: { items: [] },
+      });
+      return user.save();
     })
-    .catch((e) => console.log(e));
+    .then(() => {
+      res.redirect('/login');
+
+      const msg = {
+        to: email,
+        from: 'dahma.evangelista@gmail.com',
+        subject: 'Signup succeeded!',
+        text: 'Signup succeeded!',
+        html: '<h1>You successfully signed up</h1>',
+      };
+
+      return sgMail
+        .send(msg)
+        .then((response) => {
+          console.log(response[0].statusCode);
+          console.log(response[0].headers);
+        })
+        .catch((error) => {
+          console.error(error);
+        });
+    });
 };
 
 exports.postLogout = (req, res, next) => {
