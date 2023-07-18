@@ -1,3 +1,4 @@
+const { validationResult } = require('express-validator');
 const Product = require('../models/product');
 
 exports.getAddProduct = (req, res, next) => {
@@ -5,6 +6,9 @@ exports.getAddProduct = (req, res, next) => {
     pageTitle: 'Add Product',
     path: '/admin/add-product',
     editing: false,
+    hasError: false,
+    errorMessage: null,
+    validationErrors: [],
   });
 };
 
@@ -13,6 +17,25 @@ exports.postAddProduct = (req, res) => {
   const imageUrl = req.body.imageUrl;
   const price = req.body.price;
   const description = req.body.description;
+  const errors = validationResult(req).array();
+
+  if (errors.length > 0) {
+    return res.status(422).render('admin/edit-product', {
+      product: {
+        title: title,
+        imageUrl: imageUrl,
+        price: price,
+        description: description,
+      },
+      pageTitle: 'Add Product',
+      path: '/admin/edit-product',
+      editing: false,
+      hasError: true,
+      errorMessage: errors[0].msg,
+      validationErrors: errors,
+    });
+  }
+
   const product = new Product({
     title: title,
     price: price,
@@ -20,10 +43,11 @@ exports.postAddProduct = (req, res) => {
     description: description,
     userId: req.user,
   });
+
   product
     .save()
     .then(() => {
-      res.redirect('/');
+      res.redirect('/admin/products');
     })
     .catch((err) => console.log(err));
 };
@@ -44,6 +68,9 @@ exports.getEditProduct = (req, res, next) => {
         pageTitle: 'Edit Product',
         path: '/admin/edit-product',
         editing: editMode,
+        hasError: false,
+        errorMessage: null,
+        validationErrors: [],
       });
     })
     .catch((err) => console.log(err));
@@ -55,6 +82,25 @@ exports.postEditProduct = (req, res, next) => {
   const updatedImageUrl = req.body.imageUrl;
   const updatedPrice = req.body.price;
   const updatedDescription = req.body.description;
+  const errors = validationResult(req).array();
+
+  if (errors.length > 0) {
+    return res.status(422).render('admin/edit-product', {
+      product: {
+        title: updatedTitle,
+        imageUrl: updatedImageUrl,
+        price: updatedPrice,
+        description: updatedDescription,
+        _id: prodId,
+      },
+      pageTitle: 'Add Product',
+      path: '/admin/edit-product',
+      editing: true,
+      hasError: true,
+      errorMessage: errors[0].msg,
+      validationErrors: errors,
+    });
+  }
 
   Product.findById(prodId)
     .then((product) => {
